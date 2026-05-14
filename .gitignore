@@ -1,1 +1,6 @@
 .vscode/
+
+# Environment secrets — never commit real credentials
+.env
+
+.claude/

@@ -1,0 +1,18 @@
+[submodule "discovery-server"]
+	path = discovery-server
+	url = git@github-work:EkowSackey/discovery-server.git
+[submodule "api-gateway"]
+	path = api-gateway
+	url = git@github-work:EkowSackey/api-gateway.git
+[submodule "customer-microservice"]
+	path = customer-microservice
+	url = git@github-work:EkowSackey/customer-microservice.git
+[submodule "restaurant-microservice"]
+	path = restaurant-microservice
+	url = git@github-work:EkowSackey/restaurant-microservice.git
+[submodule "order-microservice"]
+	path = order-microservice
+	url = git@github-work:EkowSackey/order-microservice.git
+[submodule "delivery-microservice"]
+	path = delivery-microservice
+	url = git@github-work:EkowSackey/delivery-microservice.git

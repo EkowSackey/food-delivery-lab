@@ -5,15 +5,15 @@ services:
     image: postgres:15-alpine
     container_name: postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,9 +21,12 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5673:5672"
+      - "15673:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -32,80 +35,113 @@ services:
 
   discovery-server:
     build:
-      context: ./microservices/discovery-server/discovery-server
+      context: ./discovery-server
     container_name: discovery-server
     ports:
       - "8761:8761"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8761/eureka/apps || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   api-gateway:
     build:
-      context: ./microservices/api-gateway/api-gateway
+      context: ./api-gateway
     container_name: api-gateway
     ports:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       discovery-server:
-        condition: service_started
+        condition: service_healthy
 
   customer-service:
-    build: 
-      context: ./microservices/customer-service/customer-service
+    build:
+      context: ./customer-microservice/customer-service
     container_name: customer-service
     ports:
       - "8081:8081"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
       discovery-server:
-        condition: service_started
+        condition: service_healthy
 
   restaurant-service:
-    build: 
-      context: ./microservices/restaurant-service/restaurant-service
+    build:
+      context: ./restaurant-microservice/restaurant-service
     container_name: restaurant-service
     ports:
       - "8082:8082"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
       discovery-server:
-        condition: service_started
+        condition: service_healthy
 
   order-service:
-    build: 
-      context: ./microservices/order-service/order-service
+    build:
+      context: ./order-microservice/order-service
     container_name: order-service
     ports:
       - "8083:8083"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
       discovery-server:
-        condition: service_started
+        condition: service_healthy
 
   delivery-service:
-    build: 
-      context: ./microservices/delivery-service/delivery-service
+    build:
+      context: ./delivery-microservice/delivery-service
     container_name: delivery-service
     ports:
       - "8084:8084"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_SERVICE_SECRET=${INTERNAL_SERVICE_SECRET}
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
       discovery-server:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   postgres_data:
