@@ -1,0 +1,911 @@
+{
+  "info": {
+    "name": "Food Delivery API",
+    "_postman_id": "fd-lab-collection-2026-05-14",
+    "description": "End-to-end API test collection for the food delivery microservices system.\n\nAll requests go through the API Gateway at {{BASE_URL}}.\n\n**Run folders in order** — later folders depend on tokens and IDs captured by earlier ones. Collection variables are auto-populated by test scripts after login and resource creation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "BASE_URL",       "value": "http://localhost:8080", "type": "string" },
+    { "key": "CUSTOMER_TOKEN", "value": "", "type": "string" },
+    { "key": "OWNER_TOKEN",    "value": "", "type": "string" },
+    { "key": "CUSTOMER_ID",    "value": "", "type": "string" },
+    { "key": "RESTAURANT_ID",  "value": "", "type": "string" },
+    { "key": "MENU_ITEM_ID",   "value": "", "type": "string" },
+    { "key": "MENU_ITEM_ID_2", "value": "", "type": "string" },
+    { "key": "ORDER_ID",       "value": "", "type": "string" },
+    { "key": "ORDER_ID_2",     "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1 · Auth",
+      "item": [
+        {
+          "name": "Register customer",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "if (pm.response.code === 200) {",
+                "  const j = pm.response.json();",
+                "  pm.collectionVariables.set('CUSTOMER_TOKEN', j.token);",
+                "  pm.collectionVariables.set('CUSTOMER_ID', j.customerId);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"secret123\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phone\": \"+1234567890\",\n  \"deliveryAddress\": \"123 Main St\",\n  \"city\": \"Accra\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Register owner (ownerjan)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"ownerjan\",\n  \"email\": \"owner@example.com\",\n  \"password\": \"secret123\",\n  \"firstName\": \"Jan\",\n  \"lastName\": \"Owner\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Registers with CUSTOMER role. **Before running '1.4 Login as owner', promote this account via:**\n\n```\ndocker exec -it postgres psql -U postgres -d customer_db -c \"UPDATE customers SET role='RESTAURANT_OWNER' WHERE username='ownerjan';\"\n```"
+          }
+        },
+        {
+          "name": "Login as customer",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "if (pm.response.code === 200) {",
+                "  const j = pm.response.json();",
+                "  pm.collectionVariables.set('CUSTOMER_TOKEN', j.token);",
+                "  pm.collectionVariables.set('CUSTOMER_ID', j.customerId);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"secret123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Login as owner — capture OWNER_TOKEN",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "if (pm.response.code === 200) {",
+                "  pm.collectionVariables.set('OWNER_TOKEN', pm.response.json().token);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"ownerjan\",\n  \"password\": \"secret123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Run the DB promotion command from request 1.2 first, then run this. The OWNER_TOKEN variable will be auto-populated."
+          }
+        },
+        {
+          "name": "Login — wrong password (expect 401)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"wrongpassword\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Register duplicate username (expect 4xx)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 4xx', () => pm.expect(pm.response.code).to.be.within(400, 499));"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"email\": \"other@example.com\",\n  \"password\": \"secret123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Customer",
+      "item": [
+        {
+          "name": "Get own profile",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/customers/me"
+          }
+        },
+        {
+          "name": "Update own profile",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/customers/me",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Johnny\",\n  \"city\": \"Kumasi\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Get profile — no token (expect 401)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/customers/me"
+          }
+        },
+        {
+          "name": "Get customer by ID — CUSTOMER role (expect 403)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 403', () => pm.response.to.have.status(403));"]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/customers/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Restaurants — Public",
+      "item": [
+        {
+          "name": "List all restaurants",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/restaurants/search/all"
+          }
+        },
+        {
+          "name": "Search by city",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/restaurants/search/city/Accra"
+          }
+        },
+        {
+          "name": "Search by cuisine",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/restaurants/search/cuisine/Italian"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Restaurants — Owner",
+      "item": [
+        {
+          "name": "Create restaurant — capture RESTAURANT_ID",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "if (pm.response.code === 200) {",
+                "  pm.collectionVariables.set('RESTAURANT_ID', pm.response.json().id);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{OWNER_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/restaurants",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Pizza Palace\",\n  \"description\": \"Best pizza in town\",\n  \"cuisineType\": \"Italian\",\n  \"address\": \"45 Ring Road\",\n  \"city\": \"Accra\",\n  \"phone\": \"+233200000001\",\n  \"estimatedDeliveryMinutes\": 30\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Create restaurant — CUSTOMER token (expect 403)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 403', () => pm.response.to.have.status(403));"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/restaurants",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fake Restaurant\",\n  \"cuisineType\": \"Fast Food\",\n  \"address\": \"1 Some St\",\n  \"city\": \"Accra\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Add menu item — capture MENU_ITEM_ID",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "if (pm.response.code === 200) {",
+                "  pm.collectionVariables.set('MENU_ITEM_ID', pm.response.json().id);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{OWNER_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/restaurants/{{RESTAURANT_ID}}/menu",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Margherita Pizza\",\n  \"description\": \"Classic tomato and mozzarella\",\n  \"price\": 12.99,\n  \"category\": \"Pizza\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Add second menu item — capture MENU_ITEM_ID_2",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "if (pm.response.code === 200) {",
+                "  pm.collectionVariables.set('MENU_ITEM_ID_2', pm.response.json().id);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{OWNER_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/restaurants/{{RESTAURANT_ID}}/menu",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Pepperoni Pizza\",\n  \"description\": \"Loaded with pepperoni\",\n  \"price\": 15.99,\n  \"category\": \"Pizza\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Get restaurant menu (public)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has 2 items', () => pm.expect(pm.response.json().length).to.equal(2));"
+              ]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/restaurants/{{RESTAURANT_ID}}/menu"
+          }
+        },
+        {
+          "name": "Get single restaurant (public)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('ownerName is set', () => pm.expect(pm.response.json().ownerName).to.not.be.null);"
+              ]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/restaurants/{{RESTAURANT_ID}}"
+          }
+        },
+        {
+          "name": "Update menu item",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{OWNER_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/restaurants/menu/{{MENU_ITEM_ID}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Margherita Pizza\",\n  \"description\": \"Classic tomato and fresh mozzarella\",\n  \"price\": 13.99,\n  \"category\": \"Pizza\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Toggle menu item availability (off)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"]
+            }
+          }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{OWNER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/restaurants/menu/{{MENU_ITEM_ID}}/toggle"
+          }
+        },
+        {
+          "name": "Toggle menu item availability (back on)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{OWNER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/restaurants/menu/{{MENU_ITEM_ID}}/toggle"
+          }
+        },
+        {
+          "name": "Search by city (with results)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has results', () => pm.expect(pm.response.json().length).to.be.above(0));"
+              ]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/restaurants/search/city/Accra"
+          }
+        },
+        {
+          "name": "Search by cuisine (with results)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has results', () => pm.expect(pm.response.json().length).to.be.above(0));"
+              ]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/restaurants/search/cuisine/Italian"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · Orders — Customer",
+      "item": [
+        {
+          "name": "Place order — capture ORDER_ID",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "if (pm.response.code === 200) {",
+                "  pm.collectionVariables.set('ORDER_ID', pm.response.json().id);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurantId\": {{RESTAURANT_ID}},\n  \"deliveryAddress\": \"123 Main St, Accra\",\n  \"specialInstructions\": \"Extra cheese please\",\n  \"items\": [\n    { \"menuItemId\": {{MENU_ITEM_ID}}, \"quantity\": 2 },\n    { \"menuItemId\": {{MENU_ITEM_ID_2}}, \"quantity\": 1 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Get order by ID",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/orders/{{ORDER_ID}}"
+          }
+        },
+        {
+          "name": "List my orders",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has at least 1 order', () => pm.expect(pm.response.json().length).to.be.above(0));"
+              ]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/orders/my-orders"
+          }
+        },
+        {
+          "name": "Place second order — capture ORDER_ID_2",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "if (pm.response.code === 200) {",
+                "  pm.collectionVariables.set('ORDER_ID_2', pm.response.json().id);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurantId\": {{RESTAURANT_ID}},\n  \"deliveryAddress\": \"456 Side St, Accra\",\n  \"items\": [\n    { \"menuItemId\": {{MENU_ITEM_ID}}, \"quantity\": 1 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Cancel ORDER_ID_2",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Status is CANCELLED', () => pm.expect(pm.response.json().status).to.equal('CANCELLED'));"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/orders/{{ORDER_ID_2}}/cancel"
+          }
+        },
+        {
+          "name": "Place order — no token (expect 401)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurantId\": 1,\n  \"items\": [{ \"menuItemId\": 1, \"quantity\": 1 }]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 · Orders — Owner",
+      "item": [
+        {
+          "name": "Get orders for restaurant",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{OWNER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/orders/restaurant/{{RESTAURANT_ID}}"
+          }
+        },
+        {
+          "name": "Update order status → CONFIRMED",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Status is CONFIRMED', () => pm.expect(pm.response.json().status).to.equal('CONFIRMED'));"
+              ]
+            }
+          }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{OWNER_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders/{{ORDER_ID}}/status?status=CONFIRMED",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders", "{{ORDER_ID}}", "status"],
+              "query": [{ "key": "status", "value": "CONFIRMED" }]
+            }
+          }
+        },
+        {
+          "name": "Update order status → PREPARING",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{OWNER_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders/{{ORDER_ID}}/status?status=PREPARING",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders", "{{ORDER_ID}}", "status"],
+              "query": [{ "key": "status", "value": "PREPARING" }]
+            }
+          }
+        },
+        {
+          "name": "Update order status → READY_FOR_PICKUP",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{OWNER_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders/{{ORDER_ID}}/status?status=READY_FOR_PICKUP",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders", "{{ORDER_ID}}", "status"],
+              "query": [{ "key": "status", "value": "READY_FOR_PICKUP" }]
+            }
+          }
+        },
+        {
+          "name": "Customer cannot update order status (expect 403)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 403', () => pm.response.to.have.status(403));"]
+            }
+          }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders/{{ORDER_ID}}/status?status=CANCELLED",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders", "{{ORDER_ID}}", "status"],
+              "query": [{ "key": "status", "value": "CANCELLED" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 · Async Flow — Delivery Verification",
+      "description": "These requests verify the RabbitMQ-driven delivery flow. After placing an order, the delivery-service automatically creates a delivery record. Poll the order until `deliveryId` is populated (may take a few seconds).",
+      "item": [
+        {
+          "name": "Poll order — check deliveryId populated",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('deliveryId is set (async delivery created)', () => {",
+                "  pm.expect(pm.response.json().deliveryId).to.not.be.null;",
+                "});"
+              ]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/orders/{{ORDER_ID}}",
+            "description": "Re-run this request a few seconds after placing the order. The `deliveryId` field should be populated once the delivery-service has consumed the `OrderPlacedEvent` from RabbitMQ."
+          }
+        },
+        {
+          "name": "Verify cancelled order — delivery status FAILED",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Order is CANCELLED', () => pm.expect(pm.response.json().status).to.equal('CANCELLED'));"
+              ]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/orders/{{ORDER_ID_2}}",
+            "description": "ORDER_ID_2 was cancelled in folder 5. Its delivery should have been set to FAILED via the `OrderCancelledEvent` RabbitMQ flow."
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 · Edge Cases & Validation",
+      "item": [
+        {
+          "name": "Register — invalid email (expect 400)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"baduser\",\n  \"email\": \"not-an-email\",\n  \"password\": \"secret123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Register — short password (expect 400)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"baduser2\",\n  \"email\": \"bad@example.com\",\n  \"password\": \"abc\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Register — short username (expect 400)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"ab\",\n  \"email\": \"ab@example.com\",\n  \"password\": \"secret123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Order — non-existent restaurant (expect 4xx)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 4xx', () => pm.expect(pm.response.code).to.be.within(400, 499));"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurantId\": 99999,\n  \"items\": [{ \"menuItemId\": 1, \"quantity\": 1 }]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Get non-existent restaurant (expect 404)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 404', () => pm.response.to.have.status(404));"]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/restaurants/99999"
+          }
+        },
+        {
+          "name": "Order — empty items list (expect 400)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurantId\": {{RESTAURANT_ID}},\n  \"items\": []\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
